@@ -1,0 +1,90 @@
+version: '3'
+
+
+volumes:
+    
+    db-init:
+        driver: local
+        driver_opts:
+            type: none
+            o: bind
+            device: ./database
+    
+    redis-init:
+        driver: local
+        driver_opts:
+            type: none
+            o: bind
+            device: ./redis
+
+    backend-src:
+        driver: local
+        driver_opts:
+            type: none
+            o: bind
+            device: ./backend/src
+    
+    backend-test:
+        driver: local
+        driver_opts:
+            type: none
+            o: bind
+            device: ./backend/test
+    
+    nginx-conf:
+        driver: local
+        driver_opts:
+            type: none
+            o: bind
+            device: ./load_balancer
+
+
+services:
+
+    database:
+        image: postgres:latest
+        restart: always
+        volumes:
+            - db-init:/docker-entrypoint-initdb.d:ro
+        environment:
+            POSTGRES_USER: ${POSTGRES_USER}
+            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+            POSTGRES_DB: ${POSTGRES_DB}
+        ports:
+            - '${POSTGRES_PORT}:${POSTGRES_PORT}'
+    
+    redis:
+        image: redis:latest
+        volumes:
+            - redis-init:/data
+        ports:
+            - '${REDIS_PORT}'
+    
+    backend:
+        build: ./backend
+        depends_on:
+            - redis
+            - database
+        volumes:
+            - backend-src:/home/node/app/src:ro
+            - backend-test:/home/node/app/test:ro
+        environment:
+            PORT: ${BACKEND_API_PORT}
+            POSTGRES_USER: ${POSTGRES_USER}
+            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+            POSTGRES_DB: ${POSTGRES_DB}
+            POSTGRES_PORT: ${POSTGRES_PORT}
+            REDIS_PORT: ${REDIS_PORT}
+        ports:
+            - '${BACKEND_API_PORT}'
+        command: npm run ${MODE}
+        scale: ${BACKEND_SCALE_SIZE}
+    
+    load-balancer:
+        image: nginx:latest
+        volumes:
+            - nginx-conf:/etc/nginx:ro
+        depends_on:
+            - backend
+        ports:
+            - '${PUBLIC_PORT}:${PUBLIC_PORT}'

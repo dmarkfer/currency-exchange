@@ -1,0 +1,6 @@
+{
+    "verbose": true,
+    "watch": ["test"],
+    "ext": "ts,json",
+    "exec": "mocha -r ts-node/register/transpile-only test/**/*.test.ts"
+}
